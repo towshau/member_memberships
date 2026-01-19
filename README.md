@@ -45,7 +45,7 @@ The `member_memberships` table is a core table in the database that tracks membe
 - `primary_membership_id` (uuid) - Self-referencing foreign key for hierarchical membership relationships
 - `created_at` (timestamptz) - Timestamp when this record was created
 
-## Database Diagram
+## Database Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -228,6 +228,41 @@ The `member_memberships` table has **5 trigger functions** that automatically ex
 - **Timing:** AFTER
 - **Purpose:** Synchronizes the member's coach in `member_database` from the handoff coach assignment
 
+## Trigger Flow Diagram
+
+```mermaid
+flowchart TD
+    A[INSERT/UPDATE on member_memberships] --> B{Trigger Timing}
+    
+    B -->|BEFORE| C[set_status_inactive_on_not_renewing_expired]
+    B -->|BEFORE| D[set_status_inactive_on_no_sale]
+    
+    C --> E{Check Conditions}
+    E -->|Expired & Not Renewing| F[Set status = inactive]
+    E -->|Other| G[Continue]
+    
+    D --> H{Check Conditions}
+    H -->|No Sale| I[Set status = inactive]
+    H -->|Other| G
+    
+    F --> J[After INSERT/UPDATE]
+    I --> J
+    G --> J
+    
+    J --> K{Trigger Type}
+    K -->|AFTER| L[trg_member_renewal_complete]
+    K -->|AFTER| M[sync_member_coach_from_handoff_coach]
+    K -->|AFTER UPDATE| N[trg_member_not_renewing]
+    
+    L --> O[Execute Renewal Logic]
+    M --> P[Sync Coach to member_database]
+    N --> Q[Handle Not Renewing Logic]
+    
+    O --> R[Complete]
+    P --> R
+    Q --> R
+```
+
 ## Related Tables
 
 ### Direct Foreign Key Relationships
@@ -259,6 +294,29 @@ The `member_memberships` table has **5 trigger functions** that automatically ex
 | `member_vo2credits` | `membership_id` | VO2 testing credits |
 | `stripe_invoices` | `membership_id` | Payment invoices |
 | `member_myzone` | `initial_membership` | MyZone device tracking |
+
+## Membership Lifecycle Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> Trial
+    Trial --> First30: Trial started
+    First30 --> NewMember: First 30 days complete
+    First30 --> AwaitingCall: Needs call
+    AwaitingCall --> CalledNoBooking: Call completed
+    CalledNoBooking --> Booked: Session booked
+    Booked --> NewMember: Active member
+    NewMember --> Renew30: 30 days before expiry
+    Renew30 --> RenewalComplete: Renewed
+    RenewalComplete --> RenewedMember: Active renewed member
+    RenewedMember --> Renew30: Next renewal cycle
+    NewMember --> Expired: Membership expired
+    Renew30 --> NotRenewing: Member declines
+    NewMember --> NotRenewing: Member cancels
+    NotRenewing --> Expired: Final expiry
+    Expired --> [*]
+    RenewedMember --> [*]: Membership ends
+```
 
 ## Key Business Logic
 
