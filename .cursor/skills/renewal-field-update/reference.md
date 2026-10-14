@@ -97,7 +97,7 @@ After the policy is set, `holds_agreement` is replaced with the policy's canonic
 
 - `renewed_member`: previous primary (matching stage and date rules) becomes `renewal_complete`. Secondaries linked to that previous primary get `journey_stage` null.
 - `not_renewing`: upserts `member_not_renewing`. If `end_date < current_date`, this row's `status` becomes `inactive`. Without another future membership, `member_database.current_status` becomes `inactive`.
-- `no_sale`: this row's `status` becomes `inactive` and `member_database.current_status` becomes `inactive`.
+- `no_sale`: this row's `status` becomes `inactive` and `member_database.current_status` becomes `inactive`. The no-sale skill sets this on the newsale primary only (start date within 30 days). It does not set `journey_stage` on a secondary. It sets those secondaries' `status` to `inactive` directly. Writing `member_not_renewing` with `no_sale` sends the client-exit Slack and sets the linked Payment Success tracker to `No Sale`.
 - `expired`: this row's `status` becomes `inactive`. `member_database.current_status` becomes `inactive` unless a future membership or `renewed_member` rule sets the member active.
 - `not_renewing`, `no_sale`, or `expired`: posts a Pabbly webhook (`fn_membership_journey_webhook`).
 - Any journey_stage change, and any change to `start_date`, `end_date`, `coach_id`, or `handoff_coach_id`: syncs member journey notification.
